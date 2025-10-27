@@ -109,11 +109,47 @@ class SGSmartApiClient:
                 headers=headers,
             )
 
-    async def async_get_data(self) -> Any:
-        """Get data from the SG Smart API."""
+    async def _api_call_without_auth(
+        self,
+        method: str,
+        url: str,
+        data: dict | None = None,
+        headers: dict | None = None,
+    ) -> Any:
+        """Make an API call without authentication."""
+        return await self._api_wrapper(
+            method=method,
+            url=url,
+            data=data,
+            headers=headers,
+        )
 
+    async def async_get_devices(self) -> Any:
+        """Get data from the SG Smart API."""
         return await self._api_call_with_auth(
             method="get", url=f"{self._base_url}/sg/api/download"
+        )
+
+    async def async_get_control_urls(self, sector_uuid: str) -> Any:
+        """Get control URLs for devices in a specific sector."""
+        return await self._api_call_without_auth(
+            method="post",
+            url="https://sgapps2.ideaslab.hk/sgroute/route-api/server",
+            data={"sector_uuid": sector_uuid},
+            headers={"Content-Type": "application/json"},
+        )
+
+    async def async_control_device(
+        self,
+        control_url: str,
+        device_data: dict[str, Any],
+    ) -> Any:
+        """Send control command to a device using the control URL."""
+        return await self._api_call_with_auth(
+            method="post",
+            url=control_url,
+            data=device_data,
+            headers={"Content-Type": "application/json"},
         )
 
     async def async_logout(self) -> None:

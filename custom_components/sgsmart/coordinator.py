@@ -25,8 +25,29 @@ class BlueprintDataUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self) -> Any:
         """Update data via library."""
         try:
-            return await self.config_entry.runtime_data.client.async_get_data()
+            # First get the device data
+            device_data = (
+                await self.config_entry.runtime_data.client.async_get_devices()
+            )
+
+            # Extract sectors and get control URLs for the first sector
+            if device_data and "sectors" in device_data:
+                sectors = device_data["sectors"]
+                if isinstance(sectors, list) and len(sectors) > 0:
+                    first_sector_uuid = sectors[0].get("uuid")
+                    if first_sector_uuid:
+                        # Get control URLs for the first sector
+                        client = self.config_entry.runtime_data.client
+                        control_data = await client.async_get_control_urls(
+                            first_sector_uuid
+                        )
+                        # Merge control data with device data if needed
+                        if control_data:
+                            device_data["control_urls"] = control_data
+
         except SGSmartApiClientAuthenticationError as exception:
             raise ConfigEntryAuthFailed(exception) from exception
         except SGSmartApiClientError as exception:
             raise UpdateFailed(exception) from exception
+        else:
+            return device_data

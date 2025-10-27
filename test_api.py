@@ -60,7 +60,7 @@ async def test_api_client() -> None:
 
             # Test getting data - uses cookies for authentication
             print("Testing data retrieval...")
-            data = await client.async_get_data()
+            data = await client.async_get_devices()
             print(f"Data: {data}")
 
         except SGSmartApiClientAuthenticationError as e:
