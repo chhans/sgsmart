@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import socket
 from typing import Any
 
 import aiohttp
 import async_timeout
 
-from .const import BASE_URL, LOGIN_ENDPOINT
+from .const import BASE_URL, LOGIN_ENDPOINT, DEVICE_ENDPOINT, ROUTE_URL
 
 
 class SGSmartApiClientError(Exception):
@@ -127,29 +128,112 @@ class SGSmartApiClient:
     async def async_get_devices(self) -> Any:
         """Get data from the SG Smart API."""
         return await self._api_call_with_auth(
-            method="get", url=f"{self._base_url}/sg/api/download"
+            method="get", url=f"{self._base_url}{DEVICE_ENDPOINT}"
         )
 
     async def async_get_control_urls(self, sector_uuid: str) -> Any:
         """Get control URLs for devices in a specific sector."""
         return await self._api_call_without_auth(
             method="post",
-            url="https://sgapps2.ideaslab.hk/sgroute/route-api/server",
+            url=ROUTE_URL,
             data={"sector_uuid": sector_uuid},
             headers={"Content-Type": "application/json"},
         )
 
-    async def async_control_device(
+    async def async_control_device_websocket(
         self,
-        control_url: str,
-        device_data: dict[str, Any],
-    ) -> Any:
-        """Send control command to a device using the control URL."""
-        return await self._api_call_with_auth(
-            method="post",
-            url=control_url,
-            data=device_data,
-            headers={"Content-Type": "application/json"},
+        control_url_data: dict[str, Any],
+        sector_uuid: str,
+        mesh_id: int,
+        command_data: str,
+    ) -> None:
+        """Send control command to device via WebSocket."""
+        if (
+            not control_url_data
+            or "host" not in control_url_data
+            or "path" not in control_url_data
+        ):
+            msg = "Invalid control URL data"
+            raise SGSmartApiClientError(msg)
+
+        # Construct WebSocket URL
+        ws_url = f"{control_url_data['host']}{control_url_data['path']}/socket.io/?EIO=3&transport=websocket"
+        # Convert http/https to ws/wss
+        ws_url = ws_url.replace("https://", "wss://").replace("http://", "ws://")
+
+        # Prepare WebSocket message
+        message = [
+            "extModelMessage",
+            f"s_{sector_uuid.lower()}",
+            mesh_id,
+            65283,
+            command_data,
+        ]
+        # Prepend 42 to indicate message type
+        message_json = json.dumps(message)
+        message_with_type = f"42{message_json}"
+        try:
+            # Use proxy and ignore SSL certificate verification
+            connector = aiohttp.TCPConnector(
+                verify_ssl=False,
+                force_close=True,
+            )
+            proxy_url = "http://host.docker.internal:8080"
+
+            # Create a new session with the custom connector for WebSocket
+            async with (
+                aiohttp.ClientSession(connector=connector) as ws_session,
+                ws_session.ws_connect(
+                    ws_url,
+                    proxy=proxy_url,
+                    ssl=False,
+                ) as ws,
+            ):
+                await ws.send_str(message_with_type)
+                # Wait for response
+                async for msg in ws:
+                    if msg.type == aiohttp.WSMsgType.TEXT:
+                        # Process response if needed
+                        break
+                    if msg.type == aiohttp.WSMsgType.ERROR:
+                        msg_error = f"WebSocket error: {ws.exception()}"
+                        raise SGSmartApiClientCommunicationError(msg_error)
+        except Exception as exception:
+            msg = f"WebSocket communication error: {exception}"
+            raise SGSmartApiClientCommunicationError(msg) from exception
+
+    async def async_turn_on_light(
+        self,
+        control_url_data: dict[str, Any],
+        sector_uuid: str,
+        mesh_id: int,
+    ) -> None:
+        """Turn on a light."""
+        # Using the provided example command for turning on
+        command_data = "23BC0100010000"
+
+        await self.async_control_device_websocket(
+            control_url_data=control_url_data,
+            sector_uuid=sector_uuid,
+            mesh_id=mesh_id,
+            command_data=command_data,
+        )
+
+    async def async_turn_off_light(
+        self,
+        control_url_data: dict[str, Any],
+        sector_uuid: str,
+        mesh_id: int,
+    ) -> None:
+        """Turn off a light."""
+        # Turn-off command (may need adjustment based on actual protocol)
+        command_data = "23BC0000010000"
+
+        await self.async_control_device_websocket(
+            control_url_data=control_url_data,
+            sector_uuid=sector_uuid,
+            mesh_id=mesh_id,
+            command_data=command_data,
         )
 
     async def async_logout(self) -> None:

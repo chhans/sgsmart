@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from homeassistant.components.light import (
-    ATTR_BRIGHTNESS,
     LightEntity,
     LightEntityDescription,
 )
 from homeassistant.components.light.const import ColorMode
 
+from .api import SGSmartApiClientError
 from .entity import SGSmartDeviceEntity
 
 if TYPE_CHECKING:
@@ -19,6 +20,8 @@ if TYPE_CHECKING:
 
     from .coordinator import BlueprintDataUpdateCoordinator
     from .data import IntegrationBlueprintConfigEntry
+
+_LOGGER = logging.getLogger(__name__)
 
 # Constants for SG Smart dimmer devices
 DEVICE_TYPE_DIMMER = 1  # Type 1 devices are dimmers based on JSON data
@@ -124,25 +127,64 @@ class SGSmartDimmerLight(SGSmartDeviceEntity, LightEntity):
 
         return None
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
+    async def async_turn_on(self, **_kwargs: Any) -> None:
         """Turn on the dimmer."""
-        # Device control API calls would be implemented here
-        # when the SG Smart API supports device control
-        brightness = kwargs.get(ATTR_BRIGHTNESS)
-        if brightness is not None:
-            # Convert brightness from 0-255 to device min_level-max_level range
-            device_data = self.device_data
-            if device_data:
-                min_level = device_data.get("min_level", 10)
-                max_level = device_data.get("max_level", 100)
-                # Calculate device level for future API implementation
-                _device_level = min_level + (brightness / 255) * (max_level - min_level)
-                # Future: Send device control command with _device_level
+        device_data = self.device_data
+        if not device_data:
+            return
+
+        # Get control URL data from coordinator
+        if self.coordinator.data:
+            control_urls = self.coordinator.data.get("control_urls")
+        else:
+            control_urls = None
+        if not control_urls:
+            return
+
+        # Get device info needed for WebSocket control
+        mesh_id = device_data.get("mesh_id")
+        sector_uuid = device_data.get("sector_uuid")
+
+        if mesh_id and sector_uuid:
+            try:
+                client = self.coordinator.config_entry.runtime_data.client
+                await client.async_turn_on_light(
+                    control_url_data=control_urls,
+                    sector_uuid=sector_uuid,
+                    mesh_id=mesh_id,
+                )
+            except Exception as exc:
+                _LOGGER.warning("Failed to turn on light %s: %s", self._attr_name, exc)
 
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **_: Any) -> None:
         """Turn off the dimmer."""
-        # Device control API calls would be implemented here
-        # when the SG Smart API supports device control
+        device_data = self.device_data
+        if not device_data:
+            return
+
+        # Get control URL data from coordinator
+        if self.coordinator.data:
+            control_urls = self.coordinator.data.get("control_urls")
+        else:
+            control_urls = None
+        if not control_urls:
+            return
+
+        # Get device info needed for WebSocket control
+        mesh_id = device_data.get("mesh_id")
+        sector_uuid = device_data.get("sector_uuid")
+
+        if mesh_id and sector_uuid:
+            try:
+                client = self.coordinator.config_entry.runtime_data.client
+                await client.async_turn_off_light(
+                    control_url_data=control_urls,
+                    sector_uuid=sector_uuid,
+                    mesh_id=mesh_id,
+                )
+            except Exception as exc:
+                _LOGGER.warning("Failed to turn off light %s: %s", self._attr_name, exc)
+
         await self.coordinator.async_request_refresh()
