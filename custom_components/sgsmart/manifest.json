@@ -1,8 +1,8 @@
 {
-  "domain": "custom_components/sgsmart",
+  "domain": "sgsmart",
   "name": "SG Smart",
   "codeowners": [
-    "@ludeeus"
+    "@chhans"
   ],
   "config_flow": true,
   "documentation": "https://github.com/chhans/sgsmart",

@@ -4,5 +4,9 @@ from logging import Logger, getLogger
 
 LOGGER: Logger = getLogger(__package__)
 
-DOMAIN = "custom_components/sgsmart"
-ATTRIBUTION = "Data provided by http://jsonplaceholder.typicode.com/"
+DOMAIN = "sgsmart"
+ATTRIBUTION = "Data provided by SG Smart (https://leddimapp.sg-as.com/)"
+
+# API endpoints
+BASE_URL = "https://leddimapp.sg-as.com"
+LOGIN_ENDPOINT = "/sg/api/login2"
