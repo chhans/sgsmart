@@ -1,0 +1,12 @@
+{
+  "domain": "custom_components/sgsmart",
+  "name": "SG Smart",
+  "codeowners": [
+    "@ludeeus"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/chhans/sgsmart",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/chhans/sgsmart/issues",
+  "version": "0.1.0"
+}

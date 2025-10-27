@@ -1,4 +1,4 @@
-"""DataUpdateCoordinator for integration_blueprint."""
+"""DataUpdateCoordinator for custom_components/sgsmart."""
 
 from __future__ import annotations
 
