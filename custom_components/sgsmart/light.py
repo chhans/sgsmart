@@ -127,7 +127,7 @@ class SGSmartDimmerLight(SGSmartDeviceEntity, LightEntity):
 
         return None
 
-    async def async_turn_on(self, **_kwargs: Any) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the dimmer."""
         device_data = self.device_data
         if not device_data:
@@ -148,12 +148,26 @@ class SGSmartDimmerLight(SGSmartDeviceEntity, LightEntity):
         if mesh_id and sector_uuid:
             try:
                 client = self.coordinator.config_entry.runtime_data.client
-                await client.async_turn_on_light(
-                    control_url_data=control_urls,
-                    sector_uuid=sector_uuid,
-                    mesh_id=mesh_id,
-                )
-            except Exception as exc:
+
+                # Check if brightness is specified in kwargs
+                brightness = kwargs.get("brightness")
+                if brightness is not None:
+                    # Convert Home Assistant brightness (0-255) to percentage (1-100)
+                    brightness_percent = max(1, int((brightness / 255) * 100))
+                    await client.async_dim_light(
+                        control_url_data=control_urls,
+                        sector_uuid=sector_uuid,
+                        mesh_id=mesh_id,
+                        brightness_percent=brightness_percent,
+                    )
+                else:
+                    # No brightness specified, just turn on
+                    await client.async_turn_on_light(
+                        control_url_data=control_urls,
+                        sector_uuid=sector_uuid,
+                        mesh_id=mesh_id,
+                    )
+            except SGSmartApiClientError as exc:
                 _LOGGER.warning("Failed to turn on light %s: %s", self._attr_name, exc)
 
         await self.coordinator.async_request_refresh()
@@ -184,7 +198,7 @@ class SGSmartDimmerLight(SGSmartDeviceEntity, LightEntity):
                     sector_uuid=sector_uuid,
                     mesh_id=mesh_id,
                 )
-            except Exception as exc:
+            except SGSmartApiClientError as exc:
                 _LOGGER.warning("Failed to turn off light %s: %s", self._attr_name, exc)
 
         await self.coordinator.async_request_refresh()

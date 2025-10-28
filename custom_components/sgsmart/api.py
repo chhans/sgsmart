@@ -173,22 +173,24 @@ class SGSmartApiClient:
         message_json = json.dumps(message)
         message_with_type = f"42{message_json}"
         try:
-            # Use proxy and ignore SSL certificate verification
-            connector = aiohttp.TCPConnector(
-                verify_ssl=False,
-                force_close=True,
-            )
-            proxy_url = "http://host.docker.internal:8080"
+            #             # Use proxy and ignore SSL certificate verification
+            # connector = aiohttp.TCPConnector(
+            #     verify_ssl=False,
+            #     force_close=True,
+            # )
+            # proxy_url = "http://host.docker.internal:8080"
 
-            # Create a new session with the custom connector for WebSocket
-            async with (
-                aiohttp.ClientSession(connector=connector) as ws_session,
-                ws_session.ws_connect(
-                    ws_url,
-                    proxy=proxy_url,
-                    ssl=False,
-                ) as ws,
-            ):
+            # # Create a new session with the custom connector for WebSocket
+            # async with (
+            #     aiohttp.ClientSession(connector=connector) as ws_session,
+            #     ws_session.ws_connect(
+            #         ws_url,
+            #         proxy=proxy_url,
+            #         ssl=False,
+            #     ) as ws,
+            # ):
+
+            async with self._session.ws_connect(ws_url) as ws:
                 await ws.send_str(message_with_type)
                 # Wait for response
                 async for msg in ws:
@@ -228,6 +230,34 @@ class SGSmartApiClient:
         """Turn off a light."""
         # Turn-off command (may need adjustment based on actual protocol)
         command_data = "23BC0000010000"
+
+        await self.async_control_device_websocket(
+            control_url_data=control_url_data,
+            sector_uuid=sector_uuid,
+            mesh_id=mesh_id,
+            command_data=command_data,
+        )
+
+    async def async_dim_light(
+        self,
+        control_url_data: dict[str, Any],
+        sector_uuid: str,
+        mesh_id: int,
+        brightness_percent: int,
+    ) -> None:
+        """Dim a light to a specific brightness percentage (1-100)."""
+        if not 1 <= brightness_percent <= 100:
+            msg = f"Brightness must be between 1 and 100, got {brightness_percent}"
+            raise SGSmartApiClientError(msg)
+
+        # Convert percentage to hex
+        brightness_hex = f"{brightness_percent:02X}"
+
+        # No idea what the suffix means, might be something with sequence. For now always use 01
+        suffix = "01"
+
+        # Construct command: 23BC01[brightness_hex][suffix]0000
+        command_data = f"23BC01{brightness_hex}{suffix}0000"
 
         await self.async_control_device_websocket(
             control_url_data=control_url_data,
