@@ -1,46 +1,28 @@
 # Notice
 
-The component and platforms in this repository are not meant to be used by a
-user, but as a "blueprint" that custom component developers can build
-upon, to make more awesome stuff.
+This is a draft for integrating an SG smart gateway into home assistant. I just needed a way to switch on/off the lights, not have a fully working integration. B/c of this, it's just thrown together quickly. I am not going to support this officially. If you want to build something out of this, this should save you some time reverse engineering the communication. Send me a message if you do decide to complete this.
 
-HAVE FUN! 😎
+## Remaining work
 
-## Why?
+From analyzing the traffic, it's necessary to send the following websocket messages to get the status of all SG smart devices connected to a gateway:
 
-This is simple, by having custom_components look (README + structure) the same
-it is easier for developers to help each other and for users to start using them.
+```
+42["login", 10059, "{{username}}", "{{password}}", "android", "com.sgas.leddimapp", "4.34.785", "en"]
+```
 
-If you are a developer and you want to add things to this "blueprint" that you think more
-developers will have use for, please open a PR to add it :)
+```
+42["enterRoom",58468,"s_{{sector_uuid}}"]
+```
 
-## What?
+The server should send messages with all the devices status at this point, which the integration must parse. The messages look like this:
 
-This repository contains multiple files, here is a overview:
+```
+42["extModelMessage",{{mesh_id}},65283,"23BC0138010000"]
+``´
 
-File | Purpose | Documentation
--- | -- | --
-`.devcontainer.json` | Used for development/testing with Visual Studio Code. | [Documentation](https://code.visualstudio.com/docs/remote/containers)
-`.github/ISSUE_TEMPLATE/*.yml` | Templates for the issue tracker | [Documentation](https://help.github.com/en/github/building-a-strong-community/configuring-issue-templates-for-your-repository)
-`custom_components/custom_components/sgsmart/*` | Integration files, this is where everything happens. | [Documentation](https://developers.home-assistant.io/docs/creating_component_index)
-`CONTRIBUTING.md` | Guidelines on how to contribute. | [Documentation](https://help.github.com/en/github/building-a-strong-community/setting-guidelines-for-repository-contributors)
-`LICENSE` | The license file for the project. | [Documentation](https://help.github.com/en/github/creating-cloning-and-archiving-repositories/licensing-a-repository)
-`README.md` | The file you are reading now, should contain info about the integration, installation and configuration instructions. | [Documentation](https://help.github.com/en/github/writing-on-github/basic-writing-and-formatting-syntax)
-`requirements.txt` | Python packages used for development/lint/testing this integration. | [Documentation](https://pip.pypa.io/en/stable/user_guide/#requirements-files)
+Where 23BC0138010000 can be decoded to something such as:
 
-## How?
-
-1. Create a new repository in GitHub, using this repository as a template by clicking the "Use this template" button in the GitHub UI.
-1. Open your new repository in Visual Studio Code devcontainer (Preferably with the "`Dev Containers: Clone Repository in Named Container Volume...`" option).
-1. Rename all instances of the `custom_components/sgsmart` to `custom_components/<your_integration_domain>` (e.g. `custom_components/awesome_integration`).
-1. Rename all instances of the `SG Smart` to `<Your Integration Name>` (e.g. `Awesome Integration`).
-1. Run the `scripts/develop` to start HA and test out your new integration.
-
-## Next steps
-
-These are some next steps you may want to look into:
-- Add tests to your integration, [`pytest-homeassistant-custom-component`](https://github.com/MatthewFlamm/pytest-homeassistant-custom-component) can help you get started.
-- Add brand images (logo/icon) to https://github.com/home-assistant/brands.
-- Create your first release.
-- Share your integration on the [Home Assistant Forum](https://community.home-assistant.io/).
-- Submit your integration to [HACS](https://hacs.xyz/docs/publish/start).
+* `23BC01`: header
+* `38`: brightness (56% in this example)
+* `01`: on/off
+* `0000`: sometimes this is not 0000, but I don't know what it means :)
