@@ -9,7 +9,7 @@ from typing import Any
 import aiohttp
 import async_timeout
 
-from .const import BASE_URL, LOGIN_ENDPOINT, DEVICE_ENDPOINT, ROUTE_URL
+from .const import BASE_URL, LOGGER, LOGIN_ENDPOINT, DEVICE_ENDPOINT, ROUTE_URL
 
 
 class SGSmartApiClientError(Exception):
@@ -146,7 +146,7 @@ class SGSmartApiClient:
         sector_uuid: str,
         mesh_id: int,
         command_data: str,
-    ) -> None:
+    ) -> dict[str, Any] | None:
         """Send control command to device via WebSocket."""
         if (
             not control_url_data
@@ -192,17 +192,37 @@ class SGSmartApiClient:
 
             async with self._session.ws_connect(ws_url) as ws:
                 await ws.send_str(message_with_type)
+
                 # Wait for response
                 async for msg in ws:
                     if msg.type == aiohttp.WSMsgType.TEXT:
-                        # Process response if needed
-                        break
+                        LOGGER.info("WebSocket response: %s", msg.data)
+                        return self._parse_websocket_message(msg.data)
                     if msg.type == aiohttp.WSMsgType.ERROR:
                         msg_error = f"WebSocket error: {ws.exception()}"
                         raise SGSmartApiClientCommunicationError(msg_error)
         except Exception as exception:
             msg = f"WebSocket communication error: {exception}"
             raise SGSmartApiClientCommunicationError(msg) from exception
+
+        return None
+
+    def _parse_websocket_message(self, data: str) -> dict[str, Any] | None:
+        """Parse WebSocket message and extract device status."""
+        try:
+            # WebSocket responses typically start with a number prefix (like "42")
+            if data.startswith("42"):
+                json_data = data[2:]  # Remove the "42" prefix
+                parsed = json.loads(json_data)
+                return {"type": "message", "data": parsed}
+            if data.startswith("40"):
+                return {"type": "connect", "data": None}
+            if data.startswith("41"):
+                return {"type": "disconnect", "data": None}
+            return {"type": "unknown", "data": data}
+        except json.JSONDecodeError:
+            LOGGER.warning("Failed to parse WebSocket response: %s", data)
+            return {"type": "error", "data": data}
 
     async def async_turn_on_light(
         self,
@@ -253,7 +273,8 @@ class SGSmartApiClient:
         # Convert percentage to hex
         brightness_hex = f"{brightness_percent:02X}"
 
-        # No idea what the suffix means, might be something with sequence. For now always use 01
+        # No idea what the suffix means, might be something with sequence.
+        # For now always use 01
         suffix = "01"
 
         # Construct command: 23BC01[brightness_hex][suffix]0000
@@ -265,6 +286,25 @@ class SGSmartApiClient:
             mesh_id=mesh_id,
             command_data=command_data,
         )
+
+    async def async_get_device_status(
+        self,
+        control_url_data: dict[str, Any],
+        sector_uuid: str,
+        mesh_id: int,
+    ) -> dict[str, Any] | None:
+        """Get current status of a device via WebSocket."""
+        # Status request command - placeholder, needs actual protocol command
+        status_command = "23BD000000000"
+
+        response = await self.async_control_device_websocket(
+            control_url_data=control_url_data,
+            sector_uuid=sector_uuid,
+            mesh_id=mesh_id,
+            command_data=status_command,
+        )
+
+        return response
 
     async def async_logout(self) -> None:
         """Logout from SG Smart service by clearing cookies."""
