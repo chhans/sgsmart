@@ -89,43 +89,20 @@ class SGSmartDimmerLight(SGSmartDeviceEntity, LightEntity):
     @property
     def is_on(self) -> bool:
         """Return true if dimmer is on."""
-        device_data = self.device_data
-        if not device_data:
+
+        if not self.device_data:
             return False
 
-        # Check status field (0 = off, 1+ = on in SG Smart)
-        status = device_data.get("status")
-        if status is not None:
-            return status > 0
-
-        return False
+        return self.device_data.get("on", False)
 
     @property
     def brightness(self) -> int | None:
-        """Return the brightness of this light between 0..255."""
+        """Return the brightness of this light between 1..255."""
         device_data = self.device_data
         if not device_data:
             return None
 
-        # Get brightness level from device data
-        # In SG Smart, level ranges from min_level to max_level
-        min_level = device_data.get("min_level", 10)
-        max_level = device_data.get("max_level", 100)
-
-        # For now, we don't have current level in the device data from the API
-        # We'll need to get this from the actual device state when available
-        # For now, if device is on, return calculated brightness
-        if self.is_on:
-            start_up_level = device_data.get("start_up_level", 30)
-            # Convert from device range to Home Assistant range (0-255)
-            if max_level > min_level:
-                brightness_percent = (start_up_level - min_level) / (
-                    max_level - min_level
-                )
-                return int(brightness_percent * 255)
-            return 128  # Default middle brightness
-
-        return None
+        return device_data.get("brightness", 128)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the dimmer."""
@@ -167,10 +144,14 @@ class SGSmartDimmerLight(SGSmartDeviceEntity, LightEntity):
                         sector_uuid=sector_uuid,
                         mesh_id=mesh_id,
                     )
+
+                if self.device_data:
+                    self.device_data["on"] = True
+                    self.device_data["brightness"] = brightness or 255
+                    self.async_schedule_update_ha_state()
+
             except SGSmartApiClientError as exc:
                 _LOGGER.warning("Failed to turn on light %s: %s", self._attr_name, exc)
-
-        await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **_: Any) -> None:
         """Turn off the dimmer."""
@@ -202,3 +183,6 @@ class SGSmartDimmerLight(SGSmartDeviceEntity, LightEntity):
                 _LOGGER.warning("Failed to turn off light %s: %s", self._attr_name, exc)
 
         await self.coordinator.async_request_refresh()
+
+        if self.device_data:
+            self.device_data["on"] = False
