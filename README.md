@@ -14,7 +14,7 @@ From analyzing the traffic, it's necessary to send the following websocket messa
 42["enterRoom",58468,"s_{{sector_uuid}}"]
 ```
 
-The server should send messages with all the devices status at this point, which the integration must parse. The messages look like this:
+The server should send messages with all the devices status at this point, which the integration may parse. The messages look like this:
 
 ```
 42["extModelMessage",{{mesh_id}},65283,"23BC0138010000"]
@@ -26,3 +26,9 @@ Where 23BC0138010000 can be decoded to something such as:
 * `38`: brightness (56% in this example)
 * `01`: on/off
 * `0000`: sometimes this is not 0000, but I don't know what it means :)
+
+Alternatively, you can send the following message to get the status of all the devices:
+
+```
+42["requestDeviceStatus","{{sector_uuid}}","s_{{sector_uuid}}"]
+``
