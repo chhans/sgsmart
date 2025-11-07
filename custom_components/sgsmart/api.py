@@ -173,24 +173,23 @@ class SGSmartApiClient:
         message_json = json.dumps(message)
         message_with_type = f"42{message_json}"
         try:
-            #             # Use proxy and ignore SSL certificate verification
-            # connector = aiohttp.TCPConnector(
-            #     verify_ssl=False,
-            #     force_close=True,
-            # )
-            # proxy_url = "http://host.docker.internal:8080"
+            # Use proxy and ignore SSL certificate verification
+            connector = aiohttp.TCPConnector(
+                verify_ssl=False,
+                force_close=True,
+            )
+            proxy_url = "http://host.docker.internal:8080"
 
-            # # Create a new session with the custom connector for WebSocket
-            # async with (
-            #     aiohttp.ClientSession(connector=connector) as ws_session,
-            #     ws_session.ws_connect(
-            #         ws_url,
-            #         proxy=proxy_url,
-            #         ssl=False,
-            #     ) as ws,
-            # ):
-
-            async with self._session.ws_connect(ws_url) as ws:
+            # Create a new session with the custom connector for WebSocket
+            async with (
+                aiohttp.ClientSession(connector=connector) as ws_session,
+                ws_session.ws_connect(
+                    ws_url,
+                    proxy=proxy_url,
+                    ssl=False,
+                ) as ws,
+            ):
+                # async with self._session.ws_connect(ws_url) as ws:
                 await ws.send_str(message_with_type)
 
                 # Wait for response
@@ -250,6 +249,8 @@ class SGSmartApiClient:
         """Turn off a light."""
         # Turn-off command (may need adjustment based on actual protocol)
         command_data = "23BC0000010000"
+
+        print("Turning off light with command:", command_data)
 
         await self.async_control_device_websocket(
             control_url_data=control_url_data,

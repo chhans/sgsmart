@@ -10,3 +10,7 @@ logger:
   default: info
   logs:
     custom_components.custom_components/sgsmart: debug
+
+debugpy:
+  start: true
+  wait: true
